@@ -9,7 +9,9 @@ pub(crate) fn euclidean_distance(x1: Vec<f32>, x2: Vec<f32>) -> f32 {
 }
 
 /// NOTE: only for testing, extremely slow
-pub fn distance_transform_vanilla<A>(image: &Image<f32, 1, A>) -> Image<f32, 1, CpuAllocator>
+pub fn distance_transform_vanilla<A>(
+    image: &Image<f32, 1, A>,
+) -> Result<Image<f32, 1, CpuAllocator>, ImageError>
 where
     A: ImageAllocator,
 {
@@ -34,7 +36,7 @@ where
         }
     }
 
-    Image::new(image.size(), output, CpuAllocator).unwrap()
+    Image::new(image.size(), output, CpuAllocator)
 }
 
 /// Executor for computing the Euclidean Distance Transform.
@@ -194,7 +196,7 @@ mod tests {
 
         let image =
             Image::<f32, 1, _>::new(ImageSize { width, height }, data, CpuAllocator).unwrap();
-        let expected = distance_transform_vanilla(&image);
+        let expected = distance_transform_vanilla(&image).unwrap();
 
         let mut executor = DistanceTransformExecutor::new();
         let actual = executor.execute(&image).unwrap();

@@ -39,7 +39,11 @@ pub fn interpolate_pixel<const C: usize, A: ImageAllocator>(
     match interpolation {
         InterpolationMode::Bilinear => Ok(bilinear_interpolation(image, u, v, c)),
         InterpolationMode::Nearest => Ok(nearest_neighbor_interpolation(image, u, v, c)),
-        InterpolationMode::Lanczos => Err(kornia_image::ImageError::UnsupportedInterpolation),
-        InterpolationMode::Bicubic => Err(kornia_image::ImageError::UnsupportedInterpolation),
+        InterpolationMode::Lanczos => Err(kornia_image::ImageError::UnsupportedInterpolation(
+            "Lanczos".to_string(),
+        )),
+        InterpolationMode::Bicubic => Err(kornia_image::ImageError::UnsupportedInterpolation(
+            "Bicubic".to_string(),
+        )),
     }
 }

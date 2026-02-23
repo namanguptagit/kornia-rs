@@ -131,7 +131,7 @@ impl SmolModel {
 
             if ctx.debug {
                 if let Some(last) = agg_image_hidden_states.last() {
-                    debug!(
+                    log::debug!(
                         "[Sub-image] image_hidden_states length: {}",
                         last.dims2()?.0
                     );
