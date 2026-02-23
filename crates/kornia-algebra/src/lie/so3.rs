@@ -5,7 +5,11 @@ use crate::{
 use rand::Rng;
 const SMALL_ANGLE_EPSILON: f32 = 1.0e-8;
 
-#[derive(Debug, Clone, Copy)]
+/// Note regarding `PartialEq`:
+/// Quaternions form a double cover for SO3, meaning `q` and `-q` represent the
+/// same rotation. However, `PartialEq` performs an exact, member-wise comparison
+/// and will return `false` for `q` and `-q`.
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SO3F32 {
     pub q: QuatF32,
 }
