@@ -39,6 +39,7 @@ gstreamer = "*"
 gst-plugins-base = "*"
 gst-plugins-good = "*"
 nasm = "*"
+opencv = ">=4.10.0,<5"
 
 [feature.rust.activation]
 scripts = ["scripts/activate-rust.sh"]
