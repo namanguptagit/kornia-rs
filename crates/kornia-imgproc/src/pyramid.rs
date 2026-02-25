@@ -1,4 +1,4 @@
-use kornia_image::{allocator::ImageAllocator, Image, ImageError};
+use kornia_image::{allocator::ImageAllocator, Image, ImageError, ImageSize};
 use rayon::prelude::*;
 
 // Gaussian kernel weights
@@ -416,6 +416,35 @@ pub fn pyrdown_f32<const C: usize, A1: ImageAllocator, A2: ImageAllocator>(
     }
 
     Ok(())
+}
+
+/// Build a Gaussian pyramid from an image.
+/// # Arguments
+/// * `src` - The source image with shape (H, W, C).
+/// * `max_level` - The maximum level of the pyramid (0 means just the original image).
+/// # Returns
+/// A vector of images representing the Gaussian pyramid.
+pub fn build_pyramid<const C: usize>(
+    src: &Image<f32, C, kornia_tensor::CpuAllocator>,
+    max_level: usize,
+) -> Result<Vec<Image<f32, C, kornia_tensor::CpuAllocator>>, ImageError> {
+    let mut pyramid = Vec::with_capacity(max_level + 1);
+    pyramid.push(src.clone());
+
+    let mut current_img = src.clone();
+
+    for _ in 0..max_level {
+        let new_size = ImageSize {
+            width: current_img.cols().div_ceil(2),
+            height: current_img.rows().div_ceil(2),
+        };
+        let mut downsampled = Image::from_size_val(new_size, 0.0, kornia_tensor::CpuAllocator)?;
+        pyrdown_f32(&current_img, &mut downsampled)?;
+        pyramid.push(downsampled.clone());
+        current_img = downsampled;
+    }
+
+    Ok(pyramid)
 }
 
 /// Downsample a u8 image by applying Gaussian blur and then subsampling.

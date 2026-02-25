@@ -1,5 +1,5 @@
 /// Lucas–Kanade optical flow with pyramids.
-use crate::filter::spatial_gradient_float_parallel_row;
+use crate::filter::scharr_spatial_gradient_float;
 use crate::pyramid::pyrdown_f32;
 use kornia_image::{allocator::ImageAllocator, Image, ImageError, ImageSize};
 use rayon::prelude::*;
@@ -454,7 +454,7 @@ pub fn build_lk_precomputed<A: ImageAllocator>(
     for img in prev_pyr.iter().take(max_level + 1) {
         let mut ix = Image::from_size_val(img.size(), 0.0f32, prev_img.storage.alloc().clone())?;
         let mut iy = Image::from_size_val(img.size(), 0.0f32, prev_img.storage.alloc().clone())?;
-        spatial_gradient_float_parallel_row(img, &mut ix, &mut iy)?;
+        scharr_spatial_gradient_float(img, &mut ix, &mut iy)?;
         grad_x_pyr.push(ix);
         grad_y_pyr.push(iy);
     }
