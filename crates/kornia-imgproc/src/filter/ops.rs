@@ -320,15 +320,30 @@ pub fn spatial_gradient_float_parallel_row<
                 .for_each(|(c, (dx_c, dy_c))| {
                     let mut sum_x = [0.0; C];
                     let mut sum_y = [0.0; C];
-                    for dy in 0..3 {
-                        for dx in 0..3 {
-                            let row = (r + dy).min(src.rows()).max(1) - 1;
-                            let col = (c + dx).min(src.cols()).max(1) - 1;
-                            for ch in 0..C {
-                                let src_pix_offset = (row * src.cols() + col) * C + ch;
-                                let val = unsafe { src_data.get_unchecked(src_pix_offset) };
-                                sum_x[ch] += val * sobel_x[dy][dx];
-                                sum_y[ch] += val * sobel_y[dy][dx];
+                    if r > 0 && r < src.rows() - 1 && c > 0 && c < src.cols() - 1 {
+                        for dy in 0..3 {
+                            let row = r + dy - 1;
+                            for dx in 0..3 {
+                                let col = c + dx - 1;
+                                for ch in 0..C {
+                                    let src_pix_offset = (row * src.cols() + col) * C + ch;
+                                    let val = unsafe { *src_data.get_unchecked(src_pix_offset) };
+                                    sum_x[ch] += val * sobel_x[dy][dx];
+                                    sum_y[ch] += val * sobel_y[dy][dx];
+                                }
+                            }
+                        }
+                    } else {
+                        for dy in 0..3 {
+                            for dx in 0..3 {
+                                let row = (r + dy).min(src.rows()).max(1) - 1;
+                                let col = (c + dx).min(src.cols()).max(1) - 1;
+                                for ch in 0..C {
+                                    let src_pix_offset = (row * src.cols() + col) * C + ch;
+                                    let val = unsafe { *src_data.get_unchecked(src_pix_offset) };
+                                    sum_x[ch] += val * sobel_x[dy][dx];
+                                    sum_y[ch] += val * sobel_y[dy][dx];
+                                }
                             }
                         }
                     }
@@ -457,21 +472,36 @@ pub fn scharr_spatial_gradient_float<
         .enumerate()
         .for_each(|(r, (dx_row, dy_row))| {
             dx_row
-                .par_chunks_mut(C)
-                .zip(dy_row.par_chunks_mut(C))
+                .chunks_mut(C)
+                .zip(dy_row.chunks_mut(C))
                 .enumerate()
                 .for_each(|(c, (dx_c, dy_c))| {
                     let mut sum_x = [0.0; C];
                     let mut sum_y = [0.0; C];
-                    for dy in 0..3 {
-                        for dx in 0..3 {
-                            let row = (r + dy).min(src.rows()).max(1) - 1;
-                            let col = (c + dx).min(src.cols()).max(1) - 1;
-                            for ch in 0..C {
-                                let src_pix_offset = (row * src.cols() + col) * C + ch;
-                                let val = unsafe { src_data.get_unchecked(src_pix_offset) };
-                                sum_x[ch] += val * scharr_x[dy][dx];
-                                sum_y[ch] += val * scharr_y[dy][dx];
+                    if r > 0 && r < src.rows() - 1 && c > 0 && c < src.cols() - 1 {
+                        for dy in 0..3 {
+                            let row = r + dy - 1;
+                            for dx in 0..3 {
+                                let col = c + dx - 1;
+                                for ch in 0..C {
+                                    let src_pix_offset = (row * src.cols() + col) * C + ch;
+                                    let val = unsafe { *src_data.get_unchecked(src_pix_offset) };
+                                    sum_x[ch] += val * scharr_x[dy][dx];
+                                    sum_y[ch] += val * scharr_y[dy][dx];
+                                }
+                            }
+                        }
+                    } else {
+                        for dy in 0..3 {
+                            for dx in 0..3 {
+                                let row = (r + dy).min(src.rows()).max(1) - 1;
+                                let col = (c + dx).min(src.cols()).max(1) - 1;
+                                for ch in 0..C {
+                                    let src_pix_offset = (row * src.cols() + col) * C + ch;
+                                    let val = unsafe { *src_data.get_unchecked(src_pix_offset) };
+                                    sum_x[ch] += val * scharr_x[dy][dx];
+                                    sum_y[ch] += val * scharr_y[dy][dx];
+                                }
                             }
                         }
                     }
