@@ -329,12 +329,16 @@ pub fn pyrdown_f32<const C: usize, A1: ImageAllocator, A2: ImageAllocator>(
         ));
     }
 
+    // The blur is implemented as a separable 5x5 convolution to improve performance.
+    // We first process the horizontal pass, writing into a temporary buffer.
     let buffer_width = dst.width();
     let buffer_height = src.height();
     let mut buffer = vec![0.0f32; buffer_width * buffer_height * C];
 
     pyrdown_horizontal_pass_f32::<C, _>(src, &mut buffer, buffer_width);
 
+    // Then we process the vertical pass, applying the kernel and downsampling vertically.
+    // We write directly to the destination image.
     let dst_width = dst.width();
     pyrdown_vertical_pass_f32::<C>(
         &buffer,
@@ -347,6 +351,11 @@ pub fn pyrdown_f32<const C: usize, A1: ImageAllocator, A2: ImageAllocator>(
     Ok(())
 }
 
+/// Horizontal pass for pyrdown.
+///
+/// Applies the 1D Gaussian kernel `[1/16, 4/16, 6/16, 4/16, 1/16]` across the X-axis
+/// and downsamples horizontally by a factor of 2.
+/// Uses `reflect_101` border mode for boundary pixels.
 fn pyrdown_horizontal_pass_f32<const C: usize, A>(
     src: &Image<f32, C, A>,
     dst: &mut [f32],
@@ -363,6 +372,7 @@ fn pyrdown_horizontal_pass_f32<const C: usize, A>(
         .for_each(|(y, dst_row)| {
             let src_row_offset = y * src_width * C;
 
+            // Calculate safe regions for iteration, avoiding boundaries where the kernel would access out of bounds
             let safe_start = 1;
             let safe_end = if src_width > 2 {
                 (src_width - 1) / 2
@@ -370,6 +380,7 @@ fn pyrdown_horizontal_pass_f32<const C: usize, A>(
                 safe_start
             };
 
+            // Left border: access pixels using reflect_101
             for dst_x in 0..safe_start.min(dst_width) {
                 process_pixel_pyrdown_checked_f32::<C>(
                     src_data,
@@ -380,6 +391,7 @@ fn pyrdown_horizontal_pass_f32<const C: usize, A>(
                 );
             }
 
+            // Main loop for middle regions, no boundary checks needed
             let loop_end = safe_end.min(dst_width);
             if loop_end > safe_start {
                 for dst_x in safe_start..loop_end {
@@ -400,6 +412,7 @@ fn pyrdown_horizontal_pass_f32<const C: usize, A>(
                 }
             }
 
+            // Right border: access pixels using reflect_101
             for dst_x in loop_end..dst_width {
                 process_pixel_pyrdown_checked_f32::<C>(
                     src_data,
@@ -412,6 +425,7 @@ fn pyrdown_horizontal_pass_f32<const C: usize, A>(
         });
 }
 
+/// Helper function to process a single pixel using the `reflect_101` border mode.
 #[inline(always)]
 fn process_pixel_pyrdown_checked_f32<const C: usize>(
     src_data: &[f32],
@@ -439,6 +453,11 @@ fn process_pixel_pyrdown_checked_f32<const C: usize>(
     }
 }
 
+/// Vertical pass for pyrdown.
+///
+/// Applies the 1D Gaussian kernel `[1/16, 4/16, 6/16, 4/16, 1/16]` across the Y-axis
+/// and downsamples vertically by a factor of 2.
+/// Uses `reflect_101` border mode for boundary pixels.
 fn pyrdown_vertical_pass_f32<const C: usize>(
     src_buffer: &[f32],
     src_buffer_width: usize,
@@ -450,6 +469,7 @@ fn pyrdown_vertical_pass_f32<const C: usize>(
     let dst_stride = dst_width * C;
     let dst_height = dst_data.len() / dst_stride;
 
+    // Calculate safe rows to avoid vertical boundary checks
     let safe_start_y = 1;
     let safe_end_y = if src_height > 2 {
         ((src_height - 1) / 2).min(dst_height)
@@ -464,6 +484,7 @@ fn pyrdown_vertical_pass_f32<const C: usize>(
             let src_center_y = (dst_y * 2) as i32;
 
             if dst_y >= safe_start_y && dst_y < safe_end_y {
+                // Middle safe rows: direct access without boundary checks
                 let y_c = src_center_y as usize;
                 let off_m2 = (y_c - 2) * stride;
                 let off_m1 = (y_c - 1) * stride;
@@ -483,6 +504,7 @@ fn pyrdown_vertical_pass_f32<const C: usize>(
                     dst_row[i] = sum;
                 }
             } else {
+                // Boundary rows (top and bottom): compute row indices using reflect_101
                 let y_m2 = reflect_101(src_center_y - 2, src_height as i32) as usize;
                 let y_m1 = reflect_101(src_center_y - 1, src_height as i32) as usize;
                 let y_0 = reflect_101(src_center_y, src_height as i32) as usize;
