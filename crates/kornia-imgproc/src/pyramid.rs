@@ -448,6 +448,14 @@ fn pyrdown_vertical_pass_f32<const C: usize>(
 ) {
     let stride = src_buffer_width * C;
     let dst_stride = dst_width * C;
+    let dst_height = dst_data.len() / dst_stride;
+
+    let safe_start_y = 1;
+    let safe_end_y = if src_height > 2 {
+        ((src_height - 1) / 2).min(dst_height)
+    } else {
+        safe_start_y
+    };
 
     dst_data
         .par_chunks_mut(dst_stride)
@@ -455,27 +463,49 @@ fn pyrdown_vertical_pass_f32<const C: usize>(
         .for_each(|(dst_y, dst_row)| {
             let src_center_y = (dst_y * 2) as i32;
 
-            let y_m2 = reflect_101(src_center_y - 2, src_height as i32) as usize;
-            let y_m1 = reflect_101(src_center_y - 1, src_height as i32) as usize;
-            let y_0 = reflect_101(src_center_y, src_height as i32) as usize;
-            let y_p1 = reflect_101(src_center_y + 1, src_height as i32) as usize;
-            let y_p2 = reflect_101(src_center_y + 2, src_height as i32) as usize;
+            if dst_y >= safe_start_y && dst_y < safe_end_y {
+                let y_c = src_center_y as usize;
+                let off_m2 = (y_c - 2) * stride;
+                let off_m1 = (y_c - 1) * stride;
+                let off_0 = y_c * stride;
+                let off_p1 = (y_c + 1) * stride;
+                let off_p2 = (y_c + 2) * stride;
 
-            let off_m2 = y_m2 * stride;
-            let off_m1 = y_m1 * stride;
-            let off_0 = y_0 * stride;
-            let off_p1 = y_p1 * stride;
-            let off_p2 = y_p2 * stride;
+                for i in 0..dst_stride {
+                    let v_m2 = src_buffer[off_m2 + i];
+                    let v_m1 = src_buffer[off_m1 + i];
+                    let v_0 = src_buffer[off_0 + i];
+                    let v_p1 = src_buffer[off_p1 + i];
+                    let v_p2 = src_buffer[off_p2 + i];
 
-            for i in 0..dst_stride {
-                let v_m2 = src_buffer[off_m2 + i];
-                let v_m1 = src_buffer[off_m1 + i];
-                let v_0 = src_buffer[off_0 + i];
-                let v_p1 = src_buffer[off_p1 + i];
-                let v_p2 = src_buffer[off_p2 + i];
+                    let sum =
+                        0.0625 * v_m2 + 0.25 * v_m1 + 0.375 * v_0 + 0.25 * v_p1 + 0.0625 * v_p2;
+                    dst_row[i] = sum;
+                }
+            } else {
+                let y_m2 = reflect_101(src_center_y - 2, src_height as i32) as usize;
+                let y_m1 = reflect_101(src_center_y - 1, src_height as i32) as usize;
+                let y_0 = reflect_101(src_center_y, src_height as i32) as usize;
+                let y_p1 = reflect_101(src_center_y + 1, src_height as i32) as usize;
+                let y_p2 = reflect_101(src_center_y + 2, src_height as i32) as usize;
 
-                let sum = 0.0625 * v_m2 + 0.25 * v_m1 + 0.375 * v_0 + 0.25 * v_p1 + 0.0625 * v_p2;
-                dst_row[i] = sum;
+                let off_m2 = y_m2 * stride;
+                let off_m1 = y_m1 * stride;
+                let off_0 = y_0 * stride;
+                let off_p1 = y_p1 * stride;
+                let off_p2 = y_p2 * stride;
+
+                for i in 0..dst_stride {
+                    let v_m2 = src_buffer[off_m2 + i];
+                    let v_m1 = src_buffer[off_m1 + i];
+                    let v_0 = src_buffer[off_0 + i];
+                    let v_p1 = src_buffer[off_p1 + i];
+                    let v_p2 = src_buffer[off_p2 + i];
+
+                    let sum =
+                        0.0625 * v_m2 + 0.25 * v_m1 + 0.375 * v_0 + 0.25 * v_p1 + 0.0625 * v_p2;
+                    dst_row[i] = sum;
+                }
             }
         });
 }
