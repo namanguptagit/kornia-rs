@@ -122,8 +122,7 @@ pub enum TagFamilyKind {
     /// The TagStandard52H13 Family. [TagFamily::tagstandard52_h13]
     TagStandard52H13,
     /// A custom tag family, allowing users to supply a fully defined [`TagFamily`] instance.
-    // TODO: Currently, we are cloning TagFamily if it's custom. Look into optimizing this in the future.
-    Custom(Box<TagFamily>),
+    Custom(std::sync::Arc<TagFamily>),
 }
 
 impl TagFamilyKind {
@@ -145,7 +144,18 @@ impl TagFamilyKind {
 
 impl From<TagFamily> for TagFamilyKind {
     fn from(value: TagFamily) -> Self {
-        to_tag_family_kind_impl(&value)
+        match value.name.as_str() {
+            "tag16_h5" => TagFamilyKind::Tag16H5,
+            "tag36_h11" => TagFamilyKind::Tag36H11,
+            "tag36_h10" => TagFamilyKind::Tag36H10,
+            "tag25_h9" => TagFamilyKind::Tag25H9,
+            "tagcircle21_h7" => TagFamilyKind::TagCircle21H7,
+            "tagcircle49_h12" => TagFamilyKind::TagCircle49H12,
+            "tagcustom48_h12" => TagFamilyKind::TagCustom48H12,
+            "tagstandard41_h12" => TagFamilyKind::TagStandard41H12,
+            "tagstandard52_h13" => TagFamilyKind::TagStandard52H13,
+            _ => TagFamilyKind::Custom(std::sync::Arc::new(value)),
+        }
     }
 }
 
@@ -172,7 +182,7 @@ fn to_tag_family_kind_impl(value: &TagFamily) -> TagFamilyKind {
         "tagcustom48_h12" => TagFamilyKind::TagCustom48H12,
         "tagstandard41_h12" => TagFamilyKind::TagStandard41H12,
         "tagstandard52_h13" => TagFamilyKind::TagStandard52H13,
-        _ => TagFamilyKind::Custom(Box::new(value.clone())),
+        _ => TagFamilyKind::Custom(std::sync::Arc::new(value.clone())),
     }
 }
 
@@ -190,7 +200,7 @@ impl TryFrom<TagFamilyKind> for TagFamily {
             TagFamilyKind::TagCustom48H12 => TagFamily::tagcustom48_h12(),
             TagFamilyKind::TagStandard41H12 => TagFamily::tagstandard41_h12(),
             TagFamilyKind::TagStandard52H13 => TagFamily::tagstandard52_h13(),
-            TagFamilyKind::Custom(tag_family) => Ok(*tag_family),
+            TagFamilyKind::Custom(tag_family) => Ok(std::sync::Arc::unwrap_or_clone(tag_family)),
         }
     }
 }
