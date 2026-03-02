@@ -193,16 +193,14 @@ fn track_feature<A: ImageAllocator>(
     const HALF_WIN: i32 = 10;
     const WIN_PIXELS: usize = WIN_SIZE * WIN_SIZE;
 
-    let mut dx = initial_flow.map_or(0.0, |d| d[0]);
-    let mut dy = initial_flow.map_or(0.0, |d| d[1]);
+    let initial_scale = 1.0 / 2.0_f32.powi(params.max_level as i32);
+    let mut dx = initial_flow.map_or(0.0, |d| d[0] * initial_scale);
+    let mut dy = initial_flow.map_or(0.0, |d| d[1] * initial_scale);
     let mut valid = true;
     let mut tracking_error = 0.0f32;
-    if params.win_size != WIN_SIZE {
-        return (pt, 0, 0.0);
-    }
 
     for lvl in (0..=params.max_level).rev() {
-        let scale = 1.0 / (1 << lvl) as f32;
+        let scale = 1.0 / 2.0_f32.powi(lvl as i32);
         let xc = pt[0] * scale;
         let yc = pt[1] * scale;
 
@@ -423,6 +421,14 @@ pub fn build_lk_precomputed<A: ImageAllocator>(
     next_img: &Image<f32, 1, A>,
     max_level: usize,
 ) -> Result<PyrLKPrecomputed<A>, PyrLKError> {
+    if prev_img.size() != next_img.size() {
+        return Err(PyrLKError::ImageSizeMismatch {
+            prev_width: prev_img.width(),
+            prev_height: prev_img.height(),
+            next_width: next_img.width(),
+            next_height: next_img.height(),
+        });
+    }
     let mut prev_pyr = Vec::with_capacity(max_level + 1);
     let mut next_pyr = Vec::with_capacity(max_level + 1);
     prev_pyr.push(prev_img.clone());
@@ -485,7 +491,7 @@ pub fn calc_optical_flow_pyr_lk<A: ImageAllocator>(
     next_pts_in: Option<&[[f32; 2]]>,
     params: &PyrLKParams,
 ) -> Result<PyrLKResult, PyrLKError> {
-    if params.win_size == 0 || params.win_size % 2 == 0 {
+    if params.win_size != 21 {
         return Err(PyrLKError::InvalidWindowSize(params.win_size));
     }
     if prev_img.size() != next_img.size() {
@@ -517,6 +523,10 @@ pub fn calc_optical_flow_pyr_lk_with_precomputed<A: ImageAllocator>(
     next_pts_in: Option<&[[f32; 2]]>,
     params: &PyrLKParams,
 ) -> Result<PyrLKResult, PyrLKError> {
+    if params.win_size != 21 {
+        return Err(PyrLKError::InvalidWindowSize(params.win_size));
+    }
+
     let expected_levels = params.max_level + 1;
     if precomputed.prev_pyr.len() != expected_levels
         || precomputed.next_pyr.len() != expected_levels
@@ -530,6 +540,23 @@ pub fn calc_optical_flow_pyr_lk_with_precomputed<A: ImageAllocator>(
             grad_x_levels: precomputed.grad_x_pyr.len(),
             grad_y_levels: precomputed.grad_y_pyr.len(),
         });
+    }
+
+    // Validate that per-level image sizes match across the precomputed pyramids.
+    for level in 0..expected_levels {
+        let prev_size = precomputed.prev_pyr[level].size();
+        if precomputed.next_pyr[level].size() != prev_size
+            || precomputed.grad_x_pyr[level].size() != prev_size
+            || precomputed.grad_y_pyr[level].size() != prev_size
+        {
+            return Err(PyrLKError::InvalidPrecomputedLevels {
+                expected_levels,
+                prev_levels: precomputed.prev_pyr.len(),
+                next_levels: precomputed.next_pyr.len(),
+                grad_x_levels: precomputed.grad_x_pyr.len(),
+                grad_y_levels: precomputed.grad_y_pyr.len(),
+            });
+        }
     }
 
     if params.use_initial_flow
